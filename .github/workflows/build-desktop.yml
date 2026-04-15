@@ -1,4 +1,4 @@
-name: Build Windows App
+name: Build Desktop Apps
 
 on:
   workflow_dispatch:
@@ -7,13 +7,15 @@ on:
       - main
       - master
     paths:
-      - '.github/workflows/build-windows.yml'
+      - '.github/workflows/build-desktop.yml'
       - 'backend/**'
       - 'frontend/**'
+      - 'build_mac.sh'
       - 'build_win.bat'
 
 jobs:
   build-windows:
+    name: Build Windows x64
     runs-on: windows-2022
 
     steps:
@@ -52,7 +54,7 @@ jobs:
 
       - name: Run backend tests
         shell: cmd
-        run: pytest backend\tests
+        run: python -m pytest backend\tests
 
       - name: Build Windows package
         working-directory: backend
@@ -72,4 +74,60 @@ jobs:
         with:
           name: delivery-note-windows-x64
           path: backend/dist/送货单生成系统-win-x64.zip
+          if-no-files-found: error
+
+  build-macos:
+    name: Build macOS ${{ matrix.arch_name }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch_name: Intel x64
+            artifact_name: delivery-note-macos-x64
+            package_name: backend/dist/送货单生成系统-mac-x64.zip
+            runner: macos-15-intel
+          - arch_name: Apple Silicon arm64
+            artifact_name: delivery-note-macos-arm64
+            package_name: backend/dist/送货单生成系统-mac-arm64.zip
+            runner: macos-15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install backend dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install -r backend/requirements.txt pyinstaller pytest
+
+      - name: Run backend tests
+        run: python3 -m pytest backend/tests
+
+      - name: Build macOS package
+        run: bash ./build_mac.sh
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.package_name }}
           if-no-files-found: error
