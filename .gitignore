@@ -1,0 +1,14 @@
+.DS_Store
+*.pyc
+
+.buildenv/
+.buildenv-x64/
+
+backend/.pytest_cache/
+backend/__pycache__/
+backend/build/
+backend/dist/
+backend/*.spec
+
+frontend/node_modules/
+frontend/dist/
