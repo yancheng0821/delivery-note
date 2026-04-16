@@ -71,11 +71,30 @@ def _insert_extra_item_rows(ws, copy_start_row: int, extra_count: int):
     """Insert extra item rows after the template's 6 rows, copying style."""
     if extra_count <= 0:
         return
-    # Last template item row is the style source
     src_row = copy_start_row + ITEM_START_OFFSET + ITEM_COUNT - 1
     insert_at = copy_start_row + ITEM_START_OFFSET + ITEM_COUNT
+
+    # openpyxl doesn't reliably shift merged cells on insert_rows.
+    # Manually unmerge affected ranges and re-add them after insertion.
+    merges_to_fix = []
+    for merge in list(ws.merged_cells.ranges):
+        if merge.min_row >= insert_at:
+            merges_to_fix.append(
+                (merge.min_row, merge.min_col, merge.max_row, merge.max_col)
+            )
+            ws.unmerge_cells(str(merge))
+
+    ws.insert_rows(insert_at, extra_count)
+
+    for min_row, min_col, max_row, max_col in merges_to_fix:
+        ws.merge_cells(
+            start_row=min_row + extra_count,
+            start_column=min_col,
+            end_row=max_row + extra_count,
+            end_column=max_col,
+        )
+
     for i in range(extra_count):
-        ws.insert_rows(insert_at + i)
         _copy_row_style(ws, src_row, insert_at + i)
 
 
@@ -151,6 +170,14 @@ def generate_delivery_note(customer: dict, materials: list[dict],
 
     _insert_extra_item_rows(ws, COPY_START_ROW, extra)
     _fill_copy(ws, COPY_START_ROW, customer, materials, order_number, today)
+
+    # Clear the "第一联/第二联/第三联" footer row (last row of template, shifts with extra rows)
+    footer_row = COPY_START_ROW + 15 + extra
+    for merge in list(ws.merged_cells.ranges):
+        if merge.min_row == footer_row:
+            ws.unmerge_cells(str(merge))
+    for col in range(1, ws.max_column + 1):
+        ws.cell(row=footer_row, column=col).value = None
 
     output = BytesIO()
     wb.save(output)
