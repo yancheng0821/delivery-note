@@ -77,6 +77,8 @@ def test_generate_fills_customer_info():
     assert "武汉市测试路1号" in b6
     assert "张三" in b6
     assert "13800138000" in b6
+    # Only one copy — second copy header row should be empty
+    assert ws["B22"].value is None
     wb.close()
 
 
@@ -104,8 +106,8 @@ def test_generate_fills_item_row():
     wb.close()
 
 
-def test_generate_multiple_pages():
-    """8 items should produce 2 pages (6+2)."""
+def test_generate_all_items_in_one_note():
+    """All items go into a single delivery note without pagination."""
     materials = [
         {
             "material_name": f"物料{i}",
@@ -119,14 +121,13 @@ def test_generate_multiple_pages():
     result = generate_delivery_note(CUSTOMER, materials, TEMPLATE_PATH)
     wb = openpyxl.load_workbook(result)
     ws = wb.active
+    # All 8 items appear sequentially starting at row 9
     assert ws["B9"].value == 1
     assert "物料1" in str(ws["C9"].value)
     assert ws["B14"].value == 6
     assert "物料6" in str(ws["C14"].value)
-    # Page 2 in copy 2 (row 29)
-    assert ws["B29"].value == 1
-    assert "物料7" in str(ws["C29"].value)
-    assert ws["B30"].value == 2
-    assert "物料8" in str(ws["C30"].value)
-    assert ws["C31"].value is None
+    assert ws["B15"].value == 7
+    assert "物料7" in str(ws["C15"].value)
+    assert ws["B16"].value == 8
+    assert "物料8" in str(ws["C16"].value)
     wb.close()
