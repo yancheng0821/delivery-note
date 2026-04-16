@@ -77,8 +77,8 @@ def test_generate_fills_customer_info():
     assert "武汉市测试路1号" in b6
     assert "张三" in b6
     assert "13800138000" in b6
-    # Only one copy — second copy header row should be empty
-    assert ws["B22"].value is None
+    # Both copies have the same customer info
+    assert "测试客户公司" in str(ws["B25"].value)
     wb.close()
 
 

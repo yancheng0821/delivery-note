@@ -42,14 +42,12 @@ def split_amount_digits(amount: float) -> list:
 
 
 # Template row offsets (relative to copy_start_row)
-COPY_START_ROW = 2
+COPY_START_ROWS = [2, 22]
 DATE_ROW_OFFSET = 2       # row 4
 CUSTOMER_ROW_OFFSET = 3   # row 5
 ADDRESS_ROW_OFFSET = 4    # row 6
 ITEM_START_OFFSET = 7     # row 9
 ITEM_COUNT = 6            # item rows in template per copy
-# Second copy in template starts at row 22; rows 18-37 are deleted at generation time
-SECOND_COPY_START = 18
 
 
 def _copy_row_style(ws, src_row: int, dst_row: int):
@@ -139,9 +137,7 @@ def generate_delivery_note(customer: dict, materials: list[dict],
                            template_path: str) -> BytesIO:
     """Generate a delivery note Excel from template.
 
-    All materials are placed in a single delivery note (no pagination).
-    The second template copy (rows 18+) is removed; the physical printer
-    produces triplicate copies automatically.
+    All materials are placed in both copies with identical content (no pagination).
     """
     wb = openpyxl.load_workbook(template_path)
     ws = wb.active
@@ -150,14 +146,13 @@ def generate_delivery_note(customer: dict, materials: list[dict],
     order_number = today.strftime('%Y%m%d') + "-001"
     extra = max(0, len(materials) - ITEM_COUNT)
 
-    # Expand item rows if needed, then fill the single copy
-    _insert_extra_item_rows(ws, COPY_START_ROW, extra)
-    _fill_copy(ws, COPY_START_ROW, customer, materials, order_number, today)
-
-    # Delete the second template copy (rows 18 onwards) after any insertions
-    second_copy_start = SECOND_COPY_START + extra
-    if ws.max_row >= second_copy_start:
-        ws.delete_rows(second_copy_start, ws.max_row - second_copy_start + 1)
+    # Process copies top-to-bottom, tracking cumulative row shift from insertions
+    row_offset = 0
+    for cs in COPY_START_ROWS:
+        actual_cs = cs + row_offset
+        _insert_extra_item_rows(ws, actual_cs, extra)
+        row_offset += extra
+        _fill_copy(ws, actual_cs, customer, materials, order_number, today)
 
     output = BytesIO()
     wb.save(output)
