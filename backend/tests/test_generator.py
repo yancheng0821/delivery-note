@@ -72,13 +72,11 @@ def test_generate_fills_customer_info():
     wb = openpyxl.load_workbook(result)
     ws = wb.active
     assert "测试客户公司" in str(ws["B5"].value)
-    assert "编号" in str(ws["D5"].value)
+    assert "编号" in str(ws["E5"].value)
     b6 = str(ws["B6"].value)
     assert "武汉市测试路1号" in b6
     assert "张三" in b6
     assert "13800138000" in b6
-    # Both copies have the same customer info
-    assert "测试客户公司" in str(ws["B25"].value)
     wb.close()
 
 
@@ -97,12 +95,14 @@ def test_generate_fills_item_row():
     ws = wb.active
     assert ws["B9"].value == 1
     assert "磁力启动器" in str(ws["C9"].value)
-    assert "3" in str(ws["D9"].value)
-    assert ws["E9"].value == 120
-    # Amount = 360 -> I=3, J=6, K=0
-    assert ws["I9"].value == 3
-    assert ws["J9"].value == 6
-    assert ws["K9"].value == 0
+    assert ws["D9"].value == 3       # 数量
+    assert ws["E9"].value == "套"    # 单位
+    assert ws["F9"].value == 120     # 单价
+    assert ws["G9"].value == 360     # 总价
+    # Amount 360.00 -> digits [None,None,None,3,6,0,0,0] starting col H
+    assert ws["K9"].value == 3   # 佰
+    assert ws["L9"].value == 6   # 拾
+    assert ws["M9"].value == 0   # 元
     wb.close()
 
 

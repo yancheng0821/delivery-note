@@ -42,7 +42,7 @@ def split_amount_digits(amount: float) -> list:
 
 
 # Template row offsets (relative to copy_start_row)
-COPY_START_ROWS = [2, 22]
+COPY_START_ROW = 2
 DATE_ROW_OFFSET = 2       # row 4
 CUSTOMER_ROW_OFFSET = 3   # row 5
 ADDRESS_ROW_OFFSET = 4    # row 6
@@ -86,7 +86,7 @@ def _fill_copy(ws, copy_start_row: int, customer: dict, materials: list[dict],
     ws.cell(row=copy_start_row + DATE_ROW_OFFSET, column=2).value = date_str
 
     ws.cell(row=copy_start_row + CUSTOMER_ROW_OFFSET, column=2).value = f"客户名称：{customer['name']}"
-    ws.cell(row=copy_start_row + CUSTOMER_ROW_OFFSET, column=4).value = f"                    编号：{order_number}"
+    ws.cell(row=copy_start_row + CUSTOMER_ROW_OFFSET, column=5).value = f"                    编号：{order_number}"
 
     addr = customer.get("address", "")
     contact = customer.get("contact", "")
@@ -112,32 +112,35 @@ def _fill_copy(ws, copy_start_row: int, customer: dict, materials: list[dict],
             if mat.get("spec"):
                 name_spec += " " + mat["spec"]
             ws.cell(row=row, column=3).value = name_spec
-            ws.cell(row=row, column=4).value = f"{int(mat['quantity'])}/{mat['unit']}"
-            ws.cell(row=row, column=5).value = mat["unit_price"]
+            ws.cell(row=row, column=4).value = int(mat["quantity"])  # 数量
+            ws.cell(row=row, column=5).value = mat["unit"]           # 单位
+            ws.cell(row=row, column=6).value = mat["unit_price"]     # 单价
+            ws.cell(row=row, column=7).value = amount                # 总价
 
             digits = split_amount_digits(amount)
             for col_idx, digit in enumerate(digits):
-                ws.cell(row=row, column=6 + col_idx).value = digit
+                ws.cell(row=row, column=8 + col_idx).value = digit   # 金额拆位 H-O
+
+            ws.cell(row=row, column=16).value = mat.get("remark", "") or ""  # 备注
         else:
-            ws.cell(row=row, column=2).value = None
-            ws.cell(row=row, column=3).value = None
-            ws.cell(row=row, column=4).value = None
-            ws.cell(row=row, column=5).value = None
+            for col in [2, 3, 4, 5, 6, 7]:
+                ws.cell(row=row, column=col).value = None
             for col_idx in range(8):
-                ws.cell(row=row, column=6 + col_idx).value = None
+                ws.cell(row=row, column=8 + col_idx).value = None
+            ws.cell(row=row, column=16).value = None
 
     # Total row shifts down by any extra rows inserted
     total_row = copy_start_row + ITEM_START_OFFSET + rows_to_iterate
     total_digits = split_amount_digits(page_total)
     for col_idx, digit in enumerate(total_digits):
-        ws.cell(row=total_row, column=6 + col_idx).value = digit
+        ws.cell(row=total_row, column=8 + col_idx).value = digit
 
 
 def generate_delivery_note(customer: dict, materials: list[dict],
                            template_path: str) -> BytesIO:
     """Generate a delivery note Excel from template.
 
-    All materials are placed in both copies with identical content (no pagination).
+    All materials are placed in a single copy (no pagination).
     """
     wb = openpyxl.load_workbook(template_path)
     ws = wb.active
@@ -146,13 +149,8 @@ def generate_delivery_note(customer: dict, materials: list[dict],
     order_number = today.strftime('%Y%m%d') + "-001"
     extra = max(0, len(materials) - ITEM_COUNT)
 
-    # Process copies top-to-bottom, tracking cumulative row shift from insertions
-    row_offset = 0
-    for cs in COPY_START_ROWS:
-        actual_cs = cs + row_offset
-        _insert_extra_item_rows(ws, actual_cs, extra)
-        row_offset += extra
-        _fill_copy(ws, actual_cs, customer, materials, order_number, today)
+    _insert_extra_item_rows(ws, COPY_START_ROW, extra)
+    _fill_copy(ws, COPY_START_ROW, customer, materials, order_number, today)
 
     output = BytesIO()
     wb.save(output)
